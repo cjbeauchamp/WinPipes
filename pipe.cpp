@@ -1,27 +1,9 @@
-#include <windows.h> 
-#include <stdio.h>
-#include <conio.h>
-#include <tchar.h>
-
-#include <iostream>
-#include <string>
-#include <vector>
-
-using namespace std;
+#include "pipe.h"
 
 #define BUFSIZE 512
 
 HANDLE requestPipe = NULL;
 HANDLE broadcastPipe = NULL;
-
-void AaeonRequestHandler(HANDLE pipe, string request);
-void KiiBroadcastListener(HANDLE pipe, string message);
-void KiiResponseHandler(HANDLE pipe, string command, string respsonse);
-
-enum PipeTypes {
-	PIPE_REQUEST,
-	PIPE_BROADCAST
-};
 
 struct read_params {
 	HANDLE pipe;
@@ -36,7 +18,7 @@ struct ServerParams {
 
 
 
-int send_message(HANDLE pipe, string message, void(*requestHandler)(HANDLE, string, string)) {
+int send_response(HANDLE pipe, string message, void(*requestHandler)(HANDLE, string, string)) {
 
 	TCHAR  chBuf[BUFSIZE];
 	BOOL   fSuccess = FALSE;
@@ -308,7 +290,7 @@ DWORD WINAPI CreateServerHandler(LPVOID lpvParam) {
 
 }
 
-int create_server_instance(string pipeName, void(*requestHandler)(HANDLE, string), PipeTypes pipeType) {
+int create_server(string pipeName, void(*requestHandler)(HANDLE, string), PipeTypes pipeType) {
 
 	struct ServerParams *p = (struct ServerParams *) malloc(sizeof(struct ServerParams));
 
@@ -339,24 +321,14 @@ int create_server_instance(string pipeName, void(*requestHandler)(HANDLE, string
 	return 0;
 }
 
-int connect_server(void (*requestHandler)(HANDLE, string)) {
-	create_server_instance("\\\\.\\pipe\\kiiaaeon_test_request",  requestHandler, PIPE_REQUEST);
-	return 1;
-}
-
-int connect_client(void(*requestHandler)(HANDLE, string)) {
-	create_server_instance("\\\\.\\pipe\\kiiaaeon_test_broadcast", requestHandler, PIPE_BROADCAST);
-	return 1;
-}
-
 int emit_broadcast(string message) {
 	// make sure we open the pipe first
 	// TODO: make a timeout or something in case the pipe isn't available
 	while (broadcastPipe == NULL) {
-		openPipe("\\\\.\\pipe\\kiiaaeon_test_broadcast", broadcastPipe);
+		openPipe("\\\\.\\pipe\\broadcast_pipe", broadcastPipe);
 	}
 
-	send_message(broadcastPipe, message, NULL);
+	send_response(broadcastPipe, message, NULL);
 	return 1;
 }
 
@@ -364,55 +336,9 @@ int send_request(string message, void(*requestHandler)(HANDLE, string, string)) 
 	// make sure we open the pipe first
 	// TODO: make a timeout or something in case the pipe isn't available
 	while (requestPipe == NULL) {
-		openPipe("\\\\.\\pipe\\kiiaaeon_test_request", requestPipe);
+		openPipe("\\\\.\\pipe\\request_pipe", requestPipe);
 	}
 
-	send_message(requestPipe, message, requestHandler);
+	send_response(requestPipe, message, requestHandler);
 	return 1;
-}
-
-int main(int argc, char** argv) {
-
-	if (strcmp(argv[1], "1") == 0) {
-		connect_server(AaeonRequestHandler);
-
-		cout << "Send your own broadcast:" << endl;
-
-		for (string line; getline(cin, line);) {
-			emit_broadcast(line);
-		}
-	}
-	else {
-		connect_client(KiiBroadcastListener);
-
-		cout << "Send your own request:" << endl;
-
-		for (string line; getline(cin, line);) {
-			send_request(line, KiiResponseHandler);
-		}
-
-	}
-
-
-	while (1) {
-		Sleep(10000);
-	}
-	
-	return 0;
-}
-
-void AaeonRequestHandler(HANDLE pipe, string message) {
-	cout << "Received[ARH]: " << message << endl;
-
-	string response = "echoing " + message;
-	if (message == "temp") { response = "39"; }
-	send_message(pipe, response, NULL);
-}
-
-void KiiBroadcastListener(HANDLE pipe, string message) {
-	cout << "Received[KIIBL]: " << message << endl;
-}
-
-void KiiResponseHandler(HANDLE pipe, string command, string message) {
-	cout << "Received response [" << command << "]: " << message << endl;
 }
