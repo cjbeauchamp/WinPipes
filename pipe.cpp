@@ -25,7 +25,7 @@ int send_response(HANDLE pipe, string message, void(*requestHandler)(HANDLE, str
 	DWORD  cbRead, cbToWrite, cbWritten, dwMode;
 
 	cbToWrite = (strlen(message.c_str()) + 1) * sizeof(TCHAR);
-	cout << "Sending " << cbToWrite << " byte message[" << pipe << "]: \"" << message << "\"" << endl;
+	//cout << "Sending " << cbToWrite << " byte message[" << pipe << "]: \"" << message << "\"" << endl;
 
 	fSuccess = WriteFile(
 		pipe,                  // pipe handle 
@@ -40,7 +40,7 @@ int send_response(HANDLE pipe, string message, void(*requestHandler)(HANDLE, str
 		return -1;
 	}
 
-	cout << "Message sent to server" << endl;
+	//cout << "Message sent to server" << endl;
 
 	// if we're expecting a response
 	// TODO: make a timeout in case we never get anything
@@ -80,7 +80,7 @@ DWORD WINAPI ReadHandler(LPVOID lpvParam)
 	BOOL   fSuccess = FALSE;
 	DWORD  cbRead, cbToWrite, cbWritten, dwMode;
 
-	cout << "Pipe: " << p->pipe << endl;
+	//cout << "Pipe: " << p->pipe << endl;
 
 	while (1) {
 
@@ -101,12 +101,12 @@ DWORD WINAPI ReadHandler(LPVOID lpvParam)
 			break;
 		}
 
-		cout << "received: " << chBuf << endl;
+		//cout << "received: " << chBuf << endl;
 		p->requestHandler(p->pipe, chBuf);
 
 	}
 
-	cout << "Exiting the read handler" << endl;
+	//cout << "Exiting the read handler" << endl;
 
 	return 0;
 }
@@ -116,7 +116,7 @@ void startRead(HANDLE pipeFile, void(*requestHandler)(HANDLE, string)) {
 	TCHAR  chBuf[BUFSIZE];
 	DWORD  cbRead, cbToWrite, cbWritten;
 
-	cout << "Making a read thread" << endl;
+	//cout << "Making a read thread" << endl;
 
 	struct read_params *p = (struct read_params *) malloc(sizeof(struct read_params));
 
@@ -141,13 +141,13 @@ void startRead(HANDLE pipeFile, void(*requestHandler)(HANDLE, string)) {
 		CloseHandle(thread);
 	}
 
-	cout << "Start read done" << endl;
+	//cout << "Start read done" << endl;
 }
 
 
 DWORD WINAPI WriteHandler(LPVOID lpvParam) {
 
-	cout << "Created write handler" << endl;
+	//cout << "Created write handler" << endl;
 
 	HANDLE pipe = (HANDLE)lpvParam;
 	TCHAR  chBuf[BUFSIZE];
@@ -166,7 +166,7 @@ DWORD WINAPI WriteHandler(LPVOID lpvParam) {
 		return -1;
 	}
 
-	cout << "Opened pipe: " << pipe << endl;
+	//cout << "Opened pipe: " << pipe << endl;
 
 	return 0;
 }
@@ -210,7 +210,7 @@ int openPipe(string pipeName, HANDLE &pipeFile) {
 							// Break if the pipe handle is valid. 
 
 		if (pipeFile != INVALID_HANDLE_VALUE) {
-			cout << "Connected to pipe file" << endl;
+			//cout << "Connected to pipe file" << endl;
 			startWrite(pipeFile);
 
 			return 1;
@@ -242,7 +242,7 @@ DWORD WINAPI CreateServerHandler(LPVOID lpvParam) {
 	struct ServerParams *p = (struct ServerParams*) lpvParam;
 
 	for (;;) {
-		cout << "Aaeon server: Main thread awaiting Kii connection on " << p->pipeName << endl;
+		//cout << "Aaeon server: Main thread awaiting Kii connection on " << p->pipeName << endl;
 		HANDLE pipe = CreateNamedPipe(
 			p->pipeName.c_str(),             // pipe name 
 			PIPE_ACCESS_DUPLEX,       // read/write access 
@@ -269,7 +269,7 @@ DWORD WINAPI CreateServerHandler(LPVOID lpvParam) {
 			TRUE : (GetLastError() == ERROR_PIPE_CONNECTED);
 
 		if (connected) {
-			cout << "Connected!" << endl;
+			//cout << "Connected!" << endl;
 
 			// put it in the right spot
 			if (p->pipeType == PIPE_REQUEST) {
@@ -298,7 +298,7 @@ int create_server(string pipeName, void(*requestHandler)(HANDLE, string), PipeTy
 	p->requestHandler = requestHandler;
 	p->pipeType = pipeType;
 
-	cout << "Spinning off write thread" << endl;
+	//cout << "Spinning off write thread" << endl;
 
 	// spin off a 'write' thread
 	DWORD  threadId = 0;
