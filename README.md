@@ -5,12 +5,13 @@ This is a set of two programs and a library to highlight how separate programs c
 Written in C++ and specifically designed for the Windows platform, but built on top of pipes - so the architecture can be replicated on other platforms.
 
 ## Architecture
-There is a library (*pipe*) that provides the shared functions for each of the agent-based programs (*client/server*). The shared library should be included when compiling either agent. 
+There is a library (**pipe**) that provides the shared functions for each of the agent-based programs (**client/server**). The shared library should be included when compiling either agent. 
 
 There must be synchronization between agents regarding the address of each pipe when they're initialized in each agent and the library. This is already done in the sample, but any changes must be propagated to all files to make sure each agent is connected to the right pipe. There are two pipes: broadcast and request. 
 
-*Broadcast Pipe:* The server sends 1-way transmissions to any agents listening.
-*Request Pipe:* The client sends a request, and expects a response in return from the server.
+**Broadcast Pipe:** The server sends 1-way transmissions to any agents listening.
+
+**Request Pipe:** The client sends a request, and expects a response in return from the server.
 
 ### pipe.h + pipe.cpp
 These files will act as the library and hold the main communication. Some methods are exposed in `pipe.h` for use in the server/client programs.
@@ -40,3 +41,5 @@ and
 	cl /EHsc server.cpp pipe.cpp
 
 You're now left with two new executables (client and server). Run the server in one window, then open another and run the client. You can now send messages back and forth between running programs. 
+
+Try sending a request `temp` from the client to see how the `RequestHandler` works from the server. 
