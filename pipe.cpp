@@ -65,11 +65,36 @@ int send_response(HANDLE pipe, rapidxml::xml_node<>* node, void(*requestHandler)
 			rapidxml::xml_document<> doc;
 			rapidxml::xml_node<>* parent = doc.allocate_node(rapidxml::node_element, "body");
 
-			rapidxml::xml_node<>* resp = doc.allocate_node(rapidxml::node_element, "response", chBuf);
-			rapidxml::xml_node<>* req = doc.allocate_node(rapidxml::node_element, "request", message.c_str());
 
-			parent->append_node(resp);
-			parent->append_node(req);
+
+
+
+			// parse chBuf into xml doc
+			rapidxml::xml_document<> respDoc;
+			respDoc.parse<0>(respDoc.allocate_string(chBuf));
+			rapidxml::xml_node<>* clonedResponse = doc.clone_node(respDoc.first_node());
+
+			rapidxml::xml_node<>* clonedRequest = doc.clone_node(node);
+
+			//		string rdMessage;
+			//		rapidxml::print(back_inserter(rdMessage), readDoc);
+			//		cout << "Read message:" << endl;
+			//		cout << rdMessage << endl;
+
+//			rapidxml::xml_node<>* resp = doc.allocate_node(rapidxml::node_element, "response");
+//			resp->append_node(cloned);
+//			parent->append_node(resp);
+
+
+
+
+
+
+//			rapidxml::xml_node<>* resp = doc.allocate_node(rapidxml::node_element, "response", chBuf);
+//			rapidxml::xml_node<>* req = doc.allocate_node(rapidxml::node_element, "request", message.c_str());
+
+			parent->append_node(clonedResponse);
+			parent->append_node(clonedRequest);
 
 			requestHandler(pipe, parent);
 
@@ -119,11 +144,21 @@ DWORD WINAPI ReadHandler(LPVOID lpvParam)
 		rapidxml::xml_document<> doc;
 		rapidxml::xml_node<>* parent = doc.allocate_node(rapidxml::node_element, "body");
 
-		rapidxml::xml_node<>* resp = doc.allocate_node(rapidxml::node_element, "response", chBuf);
+		// parse chBuf into xml doc
+		rapidxml::xml_document<> readDoc;
+		readDoc.parse<0>(readDoc.allocate_string(chBuf));
+
+//		string rdMessage;
+//		rapidxml::print(back_inserter(rdMessage), readDoc);
+//		cout << "Read message:" << endl;
+//		cout << rdMessage << endl;
+
+		rapidxml::xml_node<>* cloned = doc.clone_node(readDoc.first_node());
+		rapidxml::xml_node<>* resp = doc.allocate_node(rapidxml::node_element, "response");
+		resp->append_node(cloned);
 		parent->append_node(resp);
 
 		p->requestHandler(p->pipe, parent);
-
 	}
 
 	//cout << "Exiting the read handler" << endl;
