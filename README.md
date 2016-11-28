@@ -43,3 +43,5 @@ and
 You're now left with two new executables (client and server). Run the server in one window, then open another and run the client. You can now send messages back and forth between running programs. 
 
 Try sending a request `temp` from the client to see how the `RequestHandler` works from the server. 
+
+![terminals](readme_img/terminals.png)
