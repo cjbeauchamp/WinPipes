@@ -23,5 +23,5 @@ int create_server(string pipeName, void(*requestHandler)(HANDLE, rapidxml::xml_n
 
 int send_request(rapidxml::xml_node<>* node, void(*requestHandler)(HANDLE, rapidxml::xml_node<>*));
 
-int send_response(HANDLE pipe, rapidxml::xml_node<>* node, void(*requestHandler)(HANDLE, rapidxml::xml_node<>*));
+int send_response(rapidxml::xml_node<>* request, rapidxml::xml_node<>* response, void(*requestHandler)(HANDLE, rapidxml::xml_node<>*));
 int emit_broadcast(rapidxml::xml_node<>* xmlDoc);

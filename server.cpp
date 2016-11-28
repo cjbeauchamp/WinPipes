@@ -1,20 +1,28 @@
 #include "pipe.h"
 
 void RequestHandler(HANDLE pipe, rapidxml::xml_node<>* node) {
-	string message;
-
 	rapidxml::xml_document<> doc;
-	doc.append_node(node);
-	rapidxml::print(back_inserter(message), doc);
 
+	// pull out the actual request
+	rapidxml::xml_node<>* request = doc.clone_node(node->first_node("request")->first_node());
+
+	string message;
+	doc.append_node(request);
+	rapidxml::print(back_inserter(message), doc);
 	cout << "Received request: " << message << endl;
 
-	string line = "Sup dude";
-	rapidxml::xml_node<>* response = doc.allocate_node(rapidxml::node_element, "response", line.c_str());
+	// based on what's in it, generate our response
 
-//	string response = "echoing " + message;
-//	if (message == "temp") { response = "39"; }
-	send_response(pipe, response, NULL);
+	// default response
+	rapidxml::xml_node<>* response = doc.allocate_node(rapidxml::node_element, "basic", "1234");
+
+	// assuming the request has a single node. Should be the only use case after spec
+	string requestName = request->name();
+	if (requestName == "temp") {
+		response = doc.allocate_node(rapidxml::node_element, "temp", "48");
+	}
+
+	send_response(request, response, NULL);
 }
 
 int main(int argc, char** argv) {
@@ -26,7 +34,7 @@ int main(int argc, char** argv) {
 	for (string line; getline(cin, line);) {
 
 		rapidxml::xml_document<> doc;
-		rapidxml::xml_node<>* message = doc.allocate_node(rapidxml::node_element, "broadcast", line.c_str());
+		rapidxml::xml_node<>* message = doc.allocate_node(rapidxml::node_element, "maintenance", line.c_str());
 
 		emit_broadcast(message);
 	}

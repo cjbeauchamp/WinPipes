@@ -16,7 +16,74 @@ struct ServerParams {
 	void(*requestHandler)(HANDLE, rapidxml::xml_node<>* node);
 };
 
+int send_body(HANDLE pipe, rapidxml::xml_node<>* node, void(*requestHandler)(HANDLE, rapidxml::xml_node<>*)) {
 
+	TCHAR  chBuf[BUFSIZE];
+	BOOL   fSuccess = FALSE;
+	DWORD  cbRead, cbToWrite, cbWritten, dwMode;
+
+	string message;
+	rapidxml::xml_document<> doc;
+	doc.append_node(node);
+	rapidxml::print(back_inserter(message), doc);
+
+	cbToWrite = (strlen(message.c_str()) + 1) * sizeof(TCHAR);
+	//cout << "Sending " << cbToWrite << " byte message[" << pipe << "]: \"" << message << "\"" << endl;
+
+	fSuccess = WriteFile(
+		pipe,                  // pipe handle 
+		message.c_str(),           // message 
+		cbToWrite,              // message length 
+		&cbWritten,             // bytes written 
+		NULL);                  // not overlapped 
+
+	if (!fSuccess)
+	{
+		cerr << "WriteFile to pipe failed (GLE=" << GetLastError() << ")" << endl;
+		return -1;
+	}
+
+	//cout << "Message sent to server" << endl;
+
+	// if we're expecting a response
+	// TODO: make a timeout in case we never get anything
+	if (requestHandler != NULL) {
+		do
+		{
+			// Read from the pipe. 
+			fSuccess = ReadFile(
+				pipe,    // pipe handle 
+				chBuf,    // buffer to receive reply 
+				BUFSIZE * sizeof(TCHAR),  // size of buffer 
+				&cbRead,  // number of bytes read 
+				NULL);    // not overlapped 
+
+			if (!fSuccess && GetLastError() != ERROR_MORE_DATA)
+				break;
+
+			// should just read in from the buffer and spit it back to the handler
+
+			// parse chBuf into xml doc
+			rapidxml::xml_document<> respDoc;
+			respDoc.parse<0>(respDoc.allocate_string(chBuf));
+			rapidxml::xml_node<>* clonedResponse = doc.clone_node(respDoc.first_node());
+
+			requestHandler(pipe, clonedResponse);
+
+		} while (!fSuccess);  // repeat loop if ERROR_MORE_DATA 
+
+		if (!fSuccess)
+		{
+			cerr << "ReadFile from pipe failed (GLE=" << GetLastError() << ")" << endl;
+			return -1;
+		}
+
+	}
+
+	return 1;
+}
+
+/*
 int send_response(HANDLE pipe, rapidxml::xml_node<>* node, void(*requestHandler)(HANDLE, rapidxml::xml_node<>*)) {
 
 	TCHAR  chBuf[BUFSIZE];
@@ -89,6 +156,7 @@ int send_response(HANDLE pipe, rapidxml::xml_node<>* node, void(*requestHandler)
 
 	return 1;
 }
+*/
 
 DWORD WINAPI ReadHandler(LPVOID lpvParam)
 {
@@ -120,9 +188,6 @@ DWORD WINAPI ReadHandler(LPVOID lpvParam)
 
 		//cout << "received: " << chBuf << endl;
 
-		rapidxml::xml_document<> doc;
-		rapidxml::xml_node<>* parent = doc.allocate_node(rapidxml::node_element, "body");
-
 		// parse chBuf into xml doc
 		rapidxml::xml_document<> readDoc;
 		readDoc.parse<0>(readDoc.allocate_string(chBuf));
@@ -132,12 +197,9 @@ DWORD WINAPI ReadHandler(LPVOID lpvParam)
 //		cout << "Read message:" << endl;
 //		cout << rdMessage << endl;
 
-		rapidxml::xml_node<>* cloned = doc.clone_node(readDoc.first_node());
-		rapidxml::xml_node<>* resp = doc.allocate_node(rapidxml::node_element, "response");
-		resp->append_node(cloned);
-		parent->append_node(resp);
+		rapidxml::xml_node<>* cloned = readDoc.clone_node(readDoc.first_node());
 
-		p->requestHandler(p->pipe, parent);
+		p->requestHandler(p->pipe, cloned);
 	}
 
 	//cout << "Exiting the read handler" << endl;
@@ -363,10 +425,12 @@ int emit_broadcast(rapidxml::xml_node<>* node) {
 	}
 
 	rapidxml::xml_document<> doc;
-	rapidxml::xml_node<>* root = doc.allocate_node(rapidxml::node_element, "broadcast");
-	root->append_node(node);
+	rapidxml::xml_node<>* body = doc.allocate_node(rapidxml::node_element, "body");
+	rapidxml::xml_node<>* bcast = doc.allocate_node(rapidxml::node_element, "broadcast");
+	bcast->append_node(node);
+	body->append_node(bcast);
 
-	send_response(broadcastPipe, root, NULL);
+	send_body(broadcastPipe, body, NULL);
 	return 1;
 }
 
@@ -377,11 +441,42 @@ int send_request(rapidxml::xml_node<>* node, void(*requestHandler)(HANDLE, rapid
 		openPipe("\\\\.\\pipe\\request_pipe", requestPipe);
 	}
 
-	rapidxml::xml_document<> doc;
-	rapidxml::xml_node<>* root = doc.allocate_node(rapidxml::node_element, "request");
-	root->append_node(node);
+//	rapidxml::xml_node<>* clonedResponse = doc.clone_node(respDoc.first_node());
 
-	send_response(requestPipe, root, requestHandler);
+	rapidxml::xml_document<> doc;
+	rapidxml::xml_node<>* body = doc.allocate_node(rapidxml::node_element, "body");
+	rapidxml::xml_node<>* request = doc.allocate_node(rapidxml::node_element, "request");
+	request->append_node(node);
+	body->append_node(request);
+
+	send_body(requestPipe, body, requestHandler);
 	
+	return 1;
+}
+
+
+int send_response(rapidxml::xml_node<>* request, rapidxml::xml_node<>* response, void(*requestHandler)(HANDLE, rapidxml::xml_node<>*)) {
+
+	/* this should already be open
+	// make sure we open the pipe first
+	// TODO: make a timeout or something in case the pipe isn't available
+	while (requestPipe == NULL) {
+		openPipe("\\\\.\\pipe\\request_pipe", requestPipe);
+	}
+	*/
+
+	rapidxml::xml_document<> doc;
+	rapidxml::xml_node<>* body = doc.allocate_node(rapidxml::node_element, "body");
+	rapidxml::xml_node<>* docRequest = doc.allocate_node(rapidxml::node_element, "request");
+	rapidxml::xml_node<>* docResponse = doc.allocate_node(rapidxml::node_element, "response");
+
+	docRequest->append_node(doc.clone_node(request));
+	docResponse->append_node(doc.clone_node(response));
+
+	body->append_node(docRequest);
+	body->append_node(docResponse);
+
+	send_body(requestPipe, body, requestHandler);
+
 	return 1;
 }
