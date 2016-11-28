@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
 	for (string line; getline(cin, line);) {
 
 		rapidxml::xml_document<> doc;
-		rapidxml::xml_node<>* message = doc.allocate_node(rapidxml::node_element, "request", line.c_str());
+		rapidxml::xml_node<>* message = doc.allocate_node(rapidxml::node_element, line.c_str());
 
 		send_request(message, ResponseHandler);
 	}
