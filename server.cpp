@@ -1,10 +1,19 @@
 #include "pipe.h"
 
-void RequestHandler(HANDLE pipe, string message) {
+void RequestHandler(HANDLE pipe, rapidxml::xml_node<>* node) {
+	string message;
+
+	rapidxml::xml_document<> doc;
+	doc.append_node(node);
+	rapidxml::print(back_inserter(message), doc);
+
 	cout << "Received request: " << message << endl;
 
-	string response = "echoing " + message;
-	if (message == "temp") { response = "39"; }
+	string line = "Sup dude";
+	rapidxml::xml_node<>* response = doc.allocate_node(rapidxml::node_element, "response", line.c_str());
+
+//	string response = "echoing " + message;
+//	if (message == "temp") { response = "39"; }
 	send_response(pipe, response, NULL);
 }
 
@@ -15,7 +24,11 @@ int main(int argc, char** argv) {
 	cout << "Send your own broadcast:" << endl;
 
 	for (string line; getline(cin, line);) {
-		emit_broadcast(line);
+
+		rapidxml::xml_document<> doc;
+		rapidxml::xml_node<>* message = doc.allocate_node(rapidxml::node_element, "broadcast", line.c_str());
+
+		emit_broadcast(message);
 	}
 
 

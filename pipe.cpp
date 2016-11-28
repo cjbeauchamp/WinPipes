@@ -7,22 +7,26 @@ HANDLE broadcastPipe = NULL;
 
 struct read_params {
 	HANDLE pipe;
-	void(*requestHandler)(HANDLE, string);
+	void(*requestHandler)(HANDLE, rapidxml::xml_node<>* node);
 } params;
 
 struct ServerParams {
 	string pipeName;
 	PipeTypes pipeType;
-	void(*requestHandler)(HANDLE, string);
+	void(*requestHandler)(HANDLE, rapidxml::xml_node<>* node);
 };
 
 
-
-int send_response(HANDLE pipe, string message, void(*requestHandler)(HANDLE, string, string)) {
+int send_response(HANDLE pipe, rapidxml::xml_node<>* node, void(*requestHandler)(HANDLE, rapidxml::xml_node<>*)) {
 
 	TCHAR  chBuf[BUFSIZE];
 	BOOL   fSuccess = FALSE;
 	DWORD  cbRead, cbToWrite, cbWritten, dwMode;
+
+	string message;
+	rapidxml::xml_document<> doc;
+	doc.append_node(node);
+	rapidxml::print(back_inserter(message), doc);
 
 	cbToWrite = (strlen(message.c_str()) + 1) * sizeof(TCHAR);
 	//cout << "Sending " << cbToWrite << " byte message[" << pipe << "]: \"" << message << "\"" << endl;
@@ -58,7 +62,16 @@ int send_response(HANDLE pipe, string message, void(*requestHandler)(HANDLE, str
 			if (!fSuccess && GetLastError() != ERROR_MORE_DATA)
 				break;
 
-			requestHandler(pipe, message, chBuf);
+			rapidxml::xml_document<> doc;
+			rapidxml::xml_node<>* parent = doc.allocate_node(rapidxml::node_element, "body");
+
+			rapidxml::xml_node<>* resp = doc.allocate_node(rapidxml::node_element, "response", chBuf);
+			rapidxml::xml_node<>* req = doc.allocate_node(rapidxml::node_element, "request", message.c_str());
+
+			parent->append_node(resp);
+			parent->append_node(req);
+
+			requestHandler(pipe, parent);
 
 		} while (!fSuccess);  // repeat loop if ERROR_MORE_DATA 
 
@@ -102,7 +115,14 @@ DWORD WINAPI ReadHandler(LPVOID lpvParam)
 		}
 
 		//cout << "received: " << chBuf << endl;
-		p->requestHandler(p->pipe, chBuf);
+
+		rapidxml::xml_document<> doc;
+		rapidxml::xml_node<>* parent = doc.allocate_node(rapidxml::node_element, "body");
+
+		rapidxml::xml_node<>* resp = doc.allocate_node(rapidxml::node_element, "response", chBuf);
+		parent->append_node(resp);
+
+		p->requestHandler(p->pipe, parent);
 
 	}
 
@@ -111,7 +131,7 @@ DWORD WINAPI ReadHandler(LPVOID lpvParam)
 	return 0;
 }
 
-void startRead(HANDLE pipeFile, void(*requestHandler)(HANDLE, string)) {
+void startRead(HANDLE pipeFile, void(*requestHandler)(HANDLE, rapidxml::xml_node<>*)) {
 
 	TCHAR  chBuf[BUFSIZE];
 	DWORD  cbRead, cbToWrite, cbWritten;
@@ -290,7 +310,7 @@ DWORD WINAPI CreateServerHandler(LPVOID lpvParam) {
 
 }
 
-int create_server(string pipeName, void(*requestHandler)(HANDLE, string), PipeTypes pipeType) {
+int create_server(string pipeName, void(*requestHandler)(HANDLE, rapidxml::xml_node<>*), PipeTypes pipeType) {
 
 	struct ServerParams *p = (struct ServerParams *) malloc(sizeof(struct ServerParams));
 
@@ -321,24 +341,33 @@ int create_server(string pipeName, void(*requestHandler)(HANDLE, string), PipeTy
 	return 0;
 }
 
-int emit_broadcast(string message) {
+int emit_broadcast(rapidxml::xml_node<>* node) {
 	// make sure we open the pipe first
 	// TODO: make a timeout or something in case the pipe isn't available
 	while (broadcastPipe == NULL) {
 		openPipe("\\\\.\\pipe\\broadcast_pipe", broadcastPipe);
 	}
 
-	send_response(broadcastPipe, message, NULL);
+	rapidxml::xml_document<> doc;
+	rapidxml::xml_node<>* root = doc.allocate_node(rapidxml::node_element, "broadcast");
+	root->append_node(node);
+
+	send_response(broadcastPipe, root, NULL);
 	return 1;
 }
 
-int send_request(string message, void(*requestHandler)(HANDLE, string, string)) {
+int send_request(rapidxml::xml_node<>* node, void(*requestHandler)(HANDLE, rapidxml::xml_node<>*)) {
 	// make sure we open the pipe first
 	// TODO: make a timeout or something in case the pipe isn't available
 	while (requestPipe == NULL) {
 		openPipe("\\\\.\\pipe\\request_pipe", requestPipe);
 	}
 
-	send_response(requestPipe, message, requestHandler);
+	rapidxml::xml_document<> doc;
+	rapidxml::xml_node<>* root = doc.allocate_node(rapidxml::node_element, "request");
+	root->append_node(node);
+
+	send_response(requestPipe, root, requestHandler);
+	
 	return 1;
 }

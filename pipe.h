@@ -7,6 +7,11 @@
 
 #include <iostream>
 #include <string>
+#include <iterator>
+
+#include "rapidxml/rapidxml.hpp"
+#include "rapidxml/rapidxml_print.hpp"
+
 using namespace std;
 
 enum PipeTypes {
@@ -14,9 +19,9 @@ enum PipeTypes {
 	PIPE_BROADCAST
 };
 
-int create_server(string pipeName, void(*requestHandler)(HANDLE, string), PipeTypes pipeType);
+int create_server(string pipeName, void(*requestHandler)(HANDLE, rapidxml::xml_node<>*), PipeTypes pipeType);
 
-int send_request(string message, void(*requestHandler)(HANDLE, string, string));
+int send_request(rapidxml::xml_node<>* node, void(*requestHandler)(HANDLE, rapidxml::xml_node<>*));
 
-int send_response(HANDLE pipe, string message, void(*requestHandler)(HANDLE, string, string));
-int emit_broadcast(string message);
+int send_response(HANDLE pipe, rapidxml::xml_node<>* node, void(*requestHandler)(HANDLE, rapidxml::xml_node<>*));
+int emit_broadcast(rapidxml::xml_node<>* xmlDoc);
